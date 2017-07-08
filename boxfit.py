@@ -20,7 +20,7 @@ def plot2d(points, c, lbl):
 	
 	fpt = np.transpose(np.asarray(fp)[indx])
 	
-	plt.plot(fpt[0], fpt[1], c, label=lbl)
+	plt.plot(fpt[0], fpt[1], c)
 	
 	plt.legend()
 
@@ -112,8 +112,22 @@ def rotate_euler_y(angle):
 	m = np.reshape(m, (3, 3))
 	
 	return m
+
+def transform2d(points, x, y):
+
+	point_list = []
+	points_t = np.transpose(points)
+
+	for i in range(0, len(points_t)):
+		
+		xx = points_t[i][0] + x
+		yy = points_t[i][1] + y
+		
+		point_list.append([xx, yy])
+		
+	return np.transpose(point_list)
 	
-def create_box2d(w, h):
+def create_box2d(w, h, z_near):
 	
 	w2 = w / 2
 	h2 = h / 2
@@ -142,9 +156,7 @@ def create_frustum2d(fov, z_near, z_far):
 	
 	x = [width_near, -width_near, width_far, -width_far]
 	y = [z_near, z_near, z_far, z_far]
-	
-	print(x, y)
-	
+		
 	return [x, y]
 
 def create_frustum3d(fov, aspect, z_near, z_far):
@@ -167,37 +179,57 @@ z_far = 10
 
 frustum = create_frustum2d(75, 1, 10)
 
+# !Create the box not centered but at a distance of z_near!
 # Rotation of the light
-theta_l = 0
+theta_l = 45
 
 # Rotation of the camera
-theta_c = 45
+theta_c = 31
 
 # Rotate the frustum
 m_c_theta = rotate_euler_z(theta_c)
 frustum_r = multiply2d(m_c_theta, frustum) 
 
 # Rotate to light frame
-m_l_theta = rotate_euler_y(theta_l)
+m_l_theta = rotate_euler_z(theta_l)
+frustum_l = multiply2d(m_l_theta, frustum_r)
 
-#frustum_l = multiply(m_l_theta, frustum_r)
+# Find minimum and maximum
+x_diff = np.max(frustum_l[0]) - np.min(frustum_l[0])
+y_diff = np.max(frustum_l[1]) - np.min(frustum_l[1])
+
+# Create a box
+box = create_box2d(x_diff, y_diff, z_near)
 
 # Rotate the box back to normal frame
-m_n_theta = rotate_euler_y(-theta_l)
+m_n_theta = rotate_euler_z(-theta_l)
+box_r = multiply2d(m_n_theta, box)
 
-#box_l = multiply(m_n_theta, box)
+# Locate the rotated frustum
+x_loc = ((np.max(frustum_r[0]) - np.min(frustum_r[0])) / 2) + np.min(frustum_r[0])
+y_loc = ((np.max(frustum_r[1]) - np.min(frustum_r[1])) / 2) + np.min(frustum_r[1])
+
+# Translation of box
+print(x_loc, y_loc)
+
+# Translate the box
+box_tr = transform2d(box_r, x_loc, y_loc)
 
 fig = plt.figure()
 #ax = fig.add_subplot(111, projection='3d')
 ax = fig.add_subplot(111)
 
 plot2d(frustum, "b", "Frustum")
-plot2d(frustum_r, "r", "Rotated frustum")
+plot2d(frustum_r, "r", "Camera rotated frustum")
+plot2d(frustum_l, "g", "Both rotated frustum")
+plot2d(box, "c", "Box")
+plot2d(box_r, "y", "Box rotated")
+plot2d(box_tr, "k", "Box rotated/transelated")
 
 plt.title("Bounding box")
 
-ax.set_xlim(-12, 12)
-ax.set_ylim(-12, 12)
+ax.set_xlim(-15, 15)
+ax.set_ylim(-15, 15)
 #ax.set_zlim(-8, 8)
 
 ax.set_xlabel("X")
